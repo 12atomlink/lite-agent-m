@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Assistant</title>
+  <link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div id="sidebar-header">
+        <span class="logo">AI Assistant</span>
+        <button id="btn-new">+</button>
+      </div>
+      <div id="session-list"></div>
+    </aside>
+    <main id="main">
+      <div id="chat-header">
+        <span id="chat-title">选择或新建会话</span>
+        <span id="chat-dir"></span>
+      </div>
+      <div id="messages"></div>
+      <div id="input-area">
+        <textarea id="input" placeholder="输入消息..." rows="3"></textarea>
+        <div id="input-btns">
+          <button id="btn-send">发送</button>
+          <button id="btn-abort" class="hidden">停止</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/web/app.js"></script>
+</body>
+</html>

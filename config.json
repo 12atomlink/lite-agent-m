@@ -1,0 +1,5 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "my-codex/gpt-5.4",
+  "small_model": "my-codex/gpt-5.4"
+}

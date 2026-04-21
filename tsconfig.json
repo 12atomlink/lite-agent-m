@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node", "bun-types"],
+    "noUncheckedIndexedAccess": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@opencode-ai/util/*": ["./src/vendor/opencode-ai/util/*"],
+      "@opencode-ai/sdk": ["./src/vendor/opencode-ai/sdk/index"],
+      "@opencode-ai/plugin": ["./src/vendor/opencode-ai/plugin/index"]
+    },
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "transform": "@effect/language-service/transform",
+        "namespaceImportPackages": ["effect", "@effect/*"]
+      }
+    ]
+  }
+}
