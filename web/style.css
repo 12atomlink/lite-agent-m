@@ -105,3 +105,14 @@ body { font-family: system-ui, sans-serif; height: 100vh; overflow: hidden; back
 .card-actions button.deny:hover { background: #b91c1c; }
 
 .hidden { display: none !important; }
+
+/* MCP App iframe */
+.part-tool.mcp-app-loading { border-color: #2563eb; color: #60a5fa; }
+.mcp-app-loading { display: flex; align-items: center; gap: 8px; }
+.mcp-app-loading::before { content: ''; display: inline-block; width: 10px; height: 10px; border: 1px solid #60a5fa; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+.part-tool.mcp-app { border-color: #2563eb; padding: 0; overflow: hidden; border-radius: 6px; }
+.part-tool.mcp-app iframe { display: block; width: 100%; border: none; }
+
+.part-tool.mcp-app-error { border-color: #dc2626; }
+.mcp-app-error { color: #dc2626; font-size: 12px; }

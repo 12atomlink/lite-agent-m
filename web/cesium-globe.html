@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cesium 3D 地球</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #cesiumContainer { width: 100%; height: 100%; overflow: hidden; }
+  #cesiumContainer { position: relative; }
+
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .btn {
+    padding: 10px 18px;
+    background: rgba(10, 20, 40, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 10px;
+    color: #e0e8f0;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .22s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: .02em;
+  }
+  .btn:hover {
+    background: rgba(30, 60, 120, 0.85);
+    border-color: rgba(100,180,255,0.45);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(0,120,255,0.25);
+  }
+  .btn:active { transform: scale(0.97); }
+
+  #info {
+    position: absolute; bottom: 20px; left: 20px; z-index: 10;
+    color: rgba(200,220,240,0.85);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    background: rgba(10,20,40,0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+<div id="panel">
+  <button class="btn" onclick="flyTo('北京', 39.9042, 116.4074, 8000)"> 北京</button>
+  <button class="btn" onclick="flyTo('上海', 31.2304, 121.4737, 6000)"> 上海</button>
+  <button class="btn" onclick="flyTo('纽约', 40.7128, -74.0060, 9000)"> 纽约</button>
+  <button class="btn" onclick="flyTo('巴黎', 48.8566, 2.3522, 6000)"> 巴黎</button>
+  <button class="btn" onclick="flyTo('悉尼', -33.8688, 151.2093, 7000)"> 悉尼</button>
+  <button class="btn" onclick="flyTo('🌍', 0, 0, 25000000)" style="margin-top:4px"> 俯瞰全球</button>
+</div>
+<div id="info">拖拽旋转 · 滚轮缩放 · 右键倾斜 · 点击按钮飞行</div>
+
+<script>
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjNhMjYiLCJpZCI6NTc5MzMsImlhdCI6MTYyNzg0NTE4MH0.XcKpgANiY19MC1bEaV1_gaahOhMgXpRvjhrT0hNVnXw';
+
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  animation: false,
+  timeline: false,
+  baseLayerPicker: false,
+  fullscreenButton: false,
+  vrButton: false,
+  geocoder: false,
+  homeButton: false,
+  sceneModePicker: false,
+  navigationHelpButton: false,
+  infoBox: false,
+  selectionIndicator: false,
+  scene3DOnly: true,
+  skyBox: new Cesium.SkyBox({
+    sources: {
+      positiveX: 'https://raw.githubusercontent.com/AnalyticalGraphicsInc/cesium/refs/heads/main/Apps/SampleData/skybox/tycho2t3_80_px.jpg',
+      negativeX: 'https://raw.githubusercontent.com/AnalyticalGraphicsInc/cesium/refs/heads/main/Apps/SampleData/skybox/tycho2t3_80_mx.jpg',
+      positiveY: 'https://raw.githubusercontent.com/AnalyticalGraphicsInc/cesium/refs/heads/main/Apps/SampleData/skybox/tycho2t3_80_py.jpg',
+      negativeY: 'https://raw.githubusercontent.com/AnalyticalGraphicsInc/cesium/refs/heads/main/Apps/SampleData/skybox/tycho2t3_80_my.jpg',
+      positiveZ: 'https://raw.githubusercontent.com/AnalyticalGraphicsInc/cesium/refs/heads/main/Apps/SampleData/skybox/tycho2t3_80_pz.jpg',
+      negativeZ: 'https://raw.githubusercontent.com/AnalyticalGraphicsInc/cesium/refs/heads/main/Apps/SampleData/skybox/tycho2t3_80_mz.jpg',
+    }
+  }),
+});
+
+viewer.scene.globe.enableLighting = true;
+viewer.scene.globe.showGroundAtmosphere = true;
+viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
+
+function flyTo(label, lat, lon, alt) {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
+    orientation: {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-25),
+      roll: 0,
+    },
+    duration: 2.2,
+    easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
+  });
+  const info = document.getElementById('info');
+  info.textContent = '正在飞往 ' + label + ' ...';
+  setTimeout(() => {
+    info.textContent = '拖拽旋转 · 滚轮缩放 · 右键倾斜 · 点击按钮飞行';
+  }, 2500);
+}
+</script>
+</body>
+</html>
