@@ -3,6 +3,7 @@ const API = ''
 let currentSessionId = null
 let currentSessionDir = null
 let currentSSE = null
+let mcpUiMeta = {}
 
 // ── DOM refs ──────────────────────────────────────────────
 const sessionList = document.getElementById('session-list')
@@ -30,6 +31,10 @@ async function api(method, path, body) {
 }
 
 // ── Sessions ──────────────────────────────────────────────
+async function loadMcpUiMeta() {
+  mcpUiMeta = await api('GET', '/mcp/ui-meta').catch(() => ({}))
+}
+
 async function loadSessions() {
   const sessions = await api('GET', '/session')
   sessionList.innerHTML = ''
@@ -106,7 +111,10 @@ function upsertMessage(event) {
   ensureMessageContainer(info)
   if (info.error) {
     const el = messages.querySelector(`[data-id="${info.id}"]`)
-    if (el) el.dataset.error = info.error.message || 'error'
+    if (el) {
+      const errMsg = info.error.data?.message || info.error.message || info.error.name || 'unknown error'
+      el.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:4px 0">Error: ${escHtml(errMsg)}</div>`
+    }
   }
 }
 
@@ -232,6 +240,15 @@ function renderToolPart(el, part) {
     }
   }
 
+  // mcp app — render interactive UI if tool has ui:// resource
+  const uiMeta = mcpUiMeta[toolName]
+  if (status === 'completed' && uiMeta) {
+    if (!el.classList.contains('mcp-app') && !el.dataset.mcpLoading && !el.dataset.mcpFailed) {
+      renderMcpApp(el, toolName, uiMeta, state)
+    }
+    return
+  }
+
   // generic tool
   el.className = `part-tool ${status}`
   const label = state.title || toolName
@@ -241,6 +258,51 @@ function renderToolPart(el, part) {
     el.innerHTML = `<details><summary>✓ ${escHtml(label)}</summary><pre>${escHtml(String(state.output || ''))}</pre></details>`
   } else {
     el.innerHTML = `<div>✗ ${escHtml(toolName)}: ${escHtml(state.error || 'error')}</div>`
+  }
+}
+
+async function mcpFetch(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) throw new Error(await res.text())
+  if (res.status === 204 || res.headers.get('content-length') === '0') return null
+  return res.json()
+}
+
+async function renderMcpApp(el, toolName, uiMeta, state) {
+  el.dataset.mcpLoading = '1'
+  el.className = 'part-tool mcp-app-loading'
+  el.innerHTML = '<div class="mcp-app-loading">Loading app...</div>'
+  try {
+    const { html, meta } = await mcpFetch(
+      'GET',
+      `/mcp/${encodeURIComponent(uiMeta.clientName)}/ui-resource?uri=${encodeURIComponent(uiMeta.resourceUri)}`
+    )
+    el.innerHTML = ''
+    const bridge = new AppBridge(el, {
+      onToolCall: async (name, args) =>
+        mcpFetch('POST', `/mcp/${encodeURIComponent(uiMeta.clientName)}/call-tool`, { toolName: name, args }),
+      theme: 'dark',
+      sessionId: currentSessionId,
+      toolName,
+      toolInput: state.input || {},
+      toolResult: {
+        content: [{ type: 'text', text: state.output || '' }],
+        ...(state.metadata?.structuredContent != null && { structuredContent: state.metadata.structuredContent }),
+      },
+    })
+    await bridge.load(html, meta)
+    el.classList.remove('mcp-app-loading')
+    el.classList.add('mcp-app')
+    delete el.dataset.mcpLoading
+  } catch (err) {
+    el.dataset.mcpFailed = '1'
+    delete el.dataset.mcpLoading
+    el.className = 'part-tool mcp-app-error completed'
+    el.innerHTML = `<div class="mcp-app-error">MCP App failed to load: ${escHtml(err.message || String(err))}</div>`
   }
 }
 
@@ -301,9 +363,23 @@ function setStatus(status) {
   if (status.type === 'busy') {
     btnSend.disabled = true
     btnAbort.classList.remove('hidden')
+    document.getElementById('status-msg')?.remove()
+  } else if (status.type === 'retry') {
+    btnSend.disabled = true
+    btnAbort.classList.remove('hidden')
+    let el = document.getElementById('status-msg')
+    if (!el) {
+      el = document.createElement('div')
+      el.id = 'status-msg'
+      el.style.cssText = 'font-size:12px;color:#f59e0b;padding:6px 20px;border-top:1px solid #333;'
+      document.getElementById('input-area').before(el)
+    }
+    const secs = Math.max(0, Math.round((status.next - Date.now()) / 1000))
+    el.textContent = `Rate limited, retrying in ${secs}s (attempt ${status.attempt})... ${status.message.split('.')[0]}`
   } else {
     btnSend.disabled = false
     btnAbort.classList.add('hidden')
+    document.getElementById('status-msg')?.remove()
   }
 }
 
@@ -321,6 +397,7 @@ function connectSSE() {
 function handleBusEvent(event) {
   if (!event?.type) return
   if (event.type === 'session.updated') loadSessions()
+  if (event.type === 'mcp.tools.changed') loadMcpUiMeta()
   if (event.type === 'session.status' && event.properties?.sessionID === currentSessionId)
     setStatus(event.properties.status)
   if (event.type === 'message.updated' && event.properties?.info?.sessionID === currentSessionId)
@@ -407,4 +484,5 @@ function escHtml(s) {
 
 // ── Init ──────────────────────────────────────────────────
 loadSessions()
+loadMcpUiMeta()
 connectSSE()

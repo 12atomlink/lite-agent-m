@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html style="height:100%">
+<head><meta charset="UTF-8"><style>html,body{margin:0;padding:0;height:100%;}</style></head>
+<body>
+<script>
+(function () {
+  var innerIframe = null
+
+  // Step 1: Receive bootstrap message from host with { type: 'mcp-sandbox-init', html: '...' }
+  // Create inner iframe with the HTML, sandboxed WITHOUT allow-same-origin
+  // (this prevents the inner app from accessing parent-origin storage even if sandbox is relaxed)
+
+  // Step 2: Relay messages:
+  //   host → outer iframe → inner iframe  (type: 'mcp-sandbox-relay-in')
+  //   inner iframe → outer iframe → host  (any other message)
+
+  window.addEventListener('message', function (event) {
+    if (window === window.parent) return; // not embedded in an iframe
+
+    // Messages from the HOST (parent frame)
+    if (event.source === window.parent) {
+      if (event.data && event.data.type === 'mcp-sandbox-init') {
+        if (innerIframe) return; // already initialized
+        // Create inner iframe
+        innerIframe = document.createElement('iframe')
+        innerIframe.style.cssText = 'width:100%;height:100%;border:none;display:block;'
+        // Sandboxed WITHOUT allow-same-origin — inner app cannot touch host storage
+        innerIframe.sandbox = 'allow-scripts allow-forms allow-popups'
+        if (typeof event.data.html !== 'string') return;
+        innerIframe.srcdoc = event.data.html
+        document.body.appendChild(innerIframe)
+        // Wait for inner iframe to finish loading before notifying host,
+        // so ui/initialize arrives after the app's JS event listeners are ready.
+        innerIframe.addEventListener('load', function () {
+          window.parent.postMessage({ type: 'ui/notifications/sandbox-proxy-ready' }, '*')
+        }, { once: true })
+      } else if (event.data && event.data.type === 'mcp-sandbox-relay-in') {
+        // Forward host → inner iframe
+        if (innerIframe && innerIframe.contentWindow) {
+          innerIframe.contentWindow.postMessage(event.data.payload, '*')
+        }
+      }
+    }
+
+    // Messages from the INNER IFRAME (app → relay → host)
+    if (innerIframe && event.source === innerIframe.contentWindow) {
+      window.parent.postMessage(event.data, '*')
+    }
+  })
+})()
+</script>
+</body>
+</html>

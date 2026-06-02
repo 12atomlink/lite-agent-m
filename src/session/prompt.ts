@@ -919,10 +919,14 @@ export namespace SessionPrompt {
         }
 
         const truncated = await Truncate.output(textParts.join("\n\n"), {}, input.agent)
-        const metadata = {
+        const metadata: Record<string, unknown> = {
           ...(result.metadata ?? {}),
           truncated: truncated.truncated,
           ...(truncated.truncated && { outputPath: truncated.outputPath }),
+        }
+        const structuredContent = (result as any).structuredContent
+        if (structuredContent != null) {
+          metadata.structuredContent = structuredContent
         }
 
         return {

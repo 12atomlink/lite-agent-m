@@ -936,4 +936,151 @@ export namespace MCP {
     const expired = await McpAuth.isTokenExpired(mcpName)
     return expired ? "expired" : "authenticated"
   }
+
+  /**
+   * Returns UI metadata for tools that declare _meta.ui.resourceUri.
+   */
+  export async function toolsUiMeta(): Promise<
+    Record<
+      string,
+      {
+        clientName: string
+        resourceUri: string
+        permissions?: string[]
+        csp?: string[]
+      }
+    >
+  > {
+    const result: Record<
+      string,
+      {
+        clientName: string
+        resourceUri: string
+        permissions?: string[]
+        csp?: string[]
+      }
+    > = {}
+    const s = await state()
+
+    const connectedClients = Object.entries(s.clients).filter(
+      ([clientName]) => s.status[clientName]?.status === "connected",
+    )
+
+    const toolsResults = await Promise.all(
+      connectedClients.map(async ([clientName, client]) => {
+        const toolsResult = await client.listTools().catch((e) => {
+          log.error("failed to get tools for ui meta", { clientName, error: e instanceof Error ? e.message : String(e) })
+          return undefined
+        })
+        return { clientName, toolsResult }
+      }),
+    )
+
+    for (const { clientName, toolsResult } of toolsResults) {
+      if (!toolsResult) continue
+      for (const mcpTool of toolsResult.tools) {
+        const uiMeta = (mcpTool as any)._meta?.ui
+        if (!uiMeta?.resourceUri) continue
+        const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
+        const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
+        result[sanitizedClientName + "_" + sanitizedToolName] = {
+          clientName,
+          resourceUri: uiMeta.resourceUri as string,
+          permissions: uiMeta.permissions as string[] | undefined,
+          csp: uiMeta.csp as string[] | undefined,
+        }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Fetches and validates a ui:// HTML resource from an MCP client.
+   */
+  export async function readUiResource(
+    clientName: string,
+    uri: string,
+  ): Promise<{
+    html: string
+    meta: { permissions?: string[]; csp?: string[] }
+  }> {
+    const allowed = ["ui://", "https://"]
+    const normalized = uri.toLowerCase()
+    if (!allowed.some((scheme) => normalized.startsWith(scheme))) {
+      throw new Failed({ name: `URI scheme not allowed: ${uri}` })
+    }
+
+    const s = await state()
+    const client = s.clients[clientName]
+    if (!client) {
+      throw new Failed({ name: `MCP client not found: ${clientName}` })
+    }
+
+    const result = await client.readResource({ uri })
+
+    const contentItem: any = result.contents?.[0] ?? (result as any).content?.[0]
+    if (!contentItem) {
+      throw new Failed({ name: `No content returned for resource: ${uri}` })
+    }
+
+    const mimeType: string | undefined = contentItem.mimeType
+    if (mimeType && !mimeType.startsWith("text/html")) {
+      throw new Failed({ name: `Unexpected MIME type for UI resource: ${mimeType}` })
+    }
+
+    const html: string = contentItem.text ?? ""
+
+    if (!html) log.warn("readUiResource returned empty HTML", { clientName, uri })
+
+    const uiMeta: any =
+      (result as any)._meta?.ui ?? (result as any).meta?.ui ?? {}
+
+    return {
+      html,
+      meta: {
+        permissions: uiMeta?.permissions as string[] | undefined,
+        csp: uiMeta?.csp as string[] | undefined,
+      },
+    }
+  }
+
+  /**
+   * Directly calls a named tool on a specific MCP client.
+   * For use by the web UI when an MCP App iframe requests a tool call.
+   */
+  export async function callTool(
+    clientName: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<unknown> {
+    const s = await state()
+    const client = s.clients[clientName]
+    if (!client) {
+      throw new Failed({ name: `MCP client not found: ${clientName}` })
+    }
+
+    // Only allow calling tools that are declared as MCP App tools (_meta.ui.resourceUri).
+    // This prevents arbitrary tool execution bypassing the agent permission system.
+    const toolsResult = await client.listTools().catch(() => undefined)
+    const mcpTool = toolsResult?.tools.find((t) => t.name === toolName)
+    if (!mcpTool || !(mcpTool as any)._meta?.ui?.resourceUri) {
+      throw new Failed({ name: `Tool is not an MCP App tool: ${toolName}` })
+    }
+
+    try {
+      const result = await client.callTool(
+        { name: toolName, arguments: args },
+        CallToolResultSchema,
+        {
+          timeout: DEFAULT_TIMEOUT,
+          resetTimeoutOnProgress: true,
+        },
+      )
+      return result
+    } catch (error) {
+      log.error("failed to call tool", { clientName, toolName, error: error instanceof Error ? error.message : String(error) })
+      throw error
+    }
+  }
 }
