@@ -28,7 +28,7 @@ import { McpRoutes } from "./routes/mcp"
 import { FileRoutes } from "./routes/file"
 import { EventRoutes } from "./routes/event"
 import { errors } from "./error"
-import { describeRoute, resolver } from "hono-openapi"
+import { describeRoute, resolver, openAPIRouteHandler } from "hono-openapi"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -167,6 +167,27 @@ export namespace Server {
           return c.json(true)
         },
       )
+      .get("/openapi.json", openAPIRouteHandler(app, {
+        documentation: {
+          info: { title: "lite-agent-m API", version: "0.0.1", description: "lite-agent-m 智能助手后端接口" },
+        },
+      }))
+      .get("/docs", (c) => c.html(`<!DOCTYPE html>
+<html>
+<head>
+  <title>lite-agent-m API Docs</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+<script>
+  SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui", presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset] })
+</script>
+</body>
+</html>`))
   }
 
   export let url: URL | undefined
