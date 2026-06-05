@@ -299,10 +299,14 @@ export namespace Session {
         updated: Date.now(),
       },
     }
-    if (input.cid) {
-      console.log("[SESSION CREATED] cid:", input.cid)
-    }
-    log.info("created", result)
+    log.info("[SESSION CREATED]: ", {
+      id: result.id,
+      title: result.title,
+      cid: input.cid,
+      parentID: input.parentID,
+      directory: input.directory,
+      hasPermission: !!input.permission,
+    })
     Database.use((db) => {
       db.insert(SessionTable).values(toRow(result)).run()
       Database.effect(() =>
