@@ -6,6 +6,7 @@ import { BusEvent } from "@/bus/bus-event"
 import { AsyncQueue } from "@/util/queue"
 import { lazy } from "@/util/lazy"
 import { Log } from "@/util/log"
+import z from "zod"
 
 const log = Log.create({ service: "server" })
 
@@ -22,7 +23,12 @@ export const EventRoutes = lazy(() =>
         },
       },
     }),
+    validator("query", z.object({ cid: z.string().optional() })),
     async (c) => {
+      const { cid } = c.req.valid("query")
+      if (cid) {
+        console.log("[EVENT CONNECTED] cid:", cid)
+      }
       log.info("event connected")
       c.header("X-Accel-Buffering", "no")
       c.header("X-Content-Type-Options", "nosniff")

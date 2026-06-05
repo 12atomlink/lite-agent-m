@@ -203,6 +203,7 @@ export namespace Session {
   export const create = fn(
     z
       .object({
+        cid: z.string().optional(),
         parentID: SessionID.zod.optional(),
         title: z.string().optional(),
         permission: Info.shape.permission,
@@ -210,6 +211,7 @@ export namespace Session {
       .optional(),
     async (input) => {
       return createNext({
+        cid: input?.cid,
         parentID: input?.parentID,
         directory: Instance.directory,
         title: input?.title,
@@ -277,6 +279,7 @@ export namespace Session {
 
   export async function createNext(input: {
     id?: SessionID
+    cid?: string
     title?: string
     parentID?: SessionID
     directory: string
@@ -295,6 +298,9 @@ export namespace Session {
         created: Date.now(),
         updated: Date.now(),
       },
+    }
+    if (input.cid) {
+      console.log("[SESSION CREATED] cid:", input.cid)
     }
     log.info("created", result)
     Database.use((db) => {
