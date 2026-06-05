@@ -299,7 +299,7 @@ export namespace Session {
         updated: Date.now(),
       },
     }
-    log.info("[SESSION CREATED]: ", {
+    log.info("session.created", {
       id: result.id,
       title: result.title,
       cid: input.cid,

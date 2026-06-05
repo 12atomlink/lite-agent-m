@@ -26,10 +26,9 @@ export const EventRoutes = lazy(() =>
     validator("query", z.object({ cid: z.string().optional() })),
     async (c) => {
       const { cid } = c.req.valid("query")
-      if (cid) {
-        console.log("[EVENT CONNECTED] cid:", cid)
-      }
-      log.info("event connected")
+      const connLog = log.clone()
+      if (cid) connLog.tag("cid", cid)
+      connLog.info("event connected")
       c.header("X-Accel-Buffering", "no")
       c.header("X-Content-Type-Options", "nosniff")
       return streamSSE(c, async (stream) => {
@@ -53,7 +52,7 @@ export const EventRoutes = lazy(() =>
           clearInterval(heartbeat)
           unsub()
           q.push(null)
-          log.info("event disconnected")
+          connLog.info("event disconnected")
         }
 
         stream.onAbort(stop)
